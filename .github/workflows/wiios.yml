@@ -37,5 +37,21 @@ jobs:
           base=$(grep -m1 'versionName "' smarttubetv/build.gradle | awk -F'"' '{print $2}')
           tag="${base}-wiios.${{ github.run_number }}"
           cd smarttubetv/build/outputs/apk/stfdroid/release
-          gh release create "$tag" *.apk --repo "${{ github.repository }}" --target "${{ github.sha }}" \
-            --title "SmartTube WiiOS $tag" --notes "${NOTES:-Manual build}"
+          # The app's own updater reads this (update_urls in common/src/stfdroid), from the latest release.
+          dl="https://github.com/${{ github.repository }}/releases/download/$tag"
+          python3 - "$tag" "$dl" "$((3000000 + ${{ github.run_number }}))" > smarttube_wiios.json <<'PY'
+          import glob, json, os, sys
+          tag, dl, code = sys.argv[1], sys.argv[2], int(sys.argv[3])
+          def apk(abi):
+              found = glob.glob("*_%s.apk" % abi)
+              return [dl + "/" + found[0]] if found else []
+          notes = (os.environ.get("NOTES") or "Update").splitlines()[0]
+          print(json.dumps({
+              "package": {"downloadUrlList": apk("armeabi-v7a"), "downloadUrlList_arm64-v8a": apk("arm64-v8a"),
+                          "downloadUrlList_x86": apk("x86")},
+              tag: {"versionCode": code, "changelog": [notes]},
+          }, indent=2))
+          PY
+          cat smarttube_wiios.json
+          gh release create "$tag" *.apk smarttube_wiios.json --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" --title "SmartTube WiiOS $tag" --notes "${NOTES:-Manual build}"

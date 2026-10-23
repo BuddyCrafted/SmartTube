@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- WiiOS edition: the manifest .github/workflows/wiios.yml attaches to every release of this fork. -->
+    <string-array name="update_urls">
+        <item>https://github.com/BuddyCrafted/SmartTube/releases/latest/download/smarttube_wiios.json</item>
+    </string-array>
+</resources>
