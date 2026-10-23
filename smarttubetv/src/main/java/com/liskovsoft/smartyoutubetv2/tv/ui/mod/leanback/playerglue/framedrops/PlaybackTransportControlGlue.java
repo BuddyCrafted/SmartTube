@@ -150,6 +150,17 @@ public class PlaybackTransportControlGlue<T extends PlayerAdapter>
                         viewHolder.getSubtitle().setText(glue.getSubtitle());
                         // MOD: add extra title line
                         viewHolder.getBody().setText(glue.getBody());
+                        // WiiOS: a big white title over the video and a quieter line under it, like YouTube.
+                        viewHolder.getTitle().setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 26);
+                        viewHolder.getTitle().setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
+                        viewHolder.getTitle().setTextColor(0xFFFFFFFF);
+                        viewHolder.getTitle().setMaxLines(3);
+                        viewHolder.getTitle().setShadowLayer(6f, 0f, 1f, 0x99000000);
+                        viewHolder.getSubtitle().setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+                        viewHolder.getSubtitle().setTextColor(0xE6FFFFFF);
+                        viewHolder.getSubtitle().setShadowLayer(4f, 0f, 1f, 0x99000000);
+                        viewHolder.getBody().setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+                        viewHolder.getBody().setTextColor(0xCCFFFFFF);
                     }
                 };
 

@@ -157,8 +157,16 @@ class ControlBarPresenter extends Presenter {
                     position++) {
                 bindControlToAction(position, adapter, presenter);
             }
-            mControlBar.setChildMarginFromCenter(
-                    getChildMarginFromCenter(mControlBar.getContext(), adapterSize));
+            // WiiOS: a row with spacers spreads across the screen, so no centred spacing.
+            boolean spread = false;
+            for (int i = 0; i < adapterSize; i++) {
+                if (adapter.get(i) instanceof com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.SpacerAction) {
+                    spread = true;
+                    break;
+                }
+            }
+            mControlBar.setChildMarginFromCenter(spread ? 0
+                    : getChildMarginFromCenter(mControlBar.getContext(), adapterSize));
         }
 
         void bindControlToAction(int position, Presenter presenter) {

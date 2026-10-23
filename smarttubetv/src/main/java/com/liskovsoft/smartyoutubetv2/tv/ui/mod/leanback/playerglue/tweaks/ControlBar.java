@@ -72,6 +72,12 @@ class ControlBar extends LinearLayout {
     }
 
     int getDefaultFocusIndex() {
+        // WiiOS: the YouTube-style row starts on its play button.
+        for (int i = 0; i < getChildCount(); i++) {
+            if (getChildAt(i).getTag(com.liskovsoft.smartyoutubetv2.tv.R.id.yt_default_focus) != null) {
+                return i;
+            }
+        }
         return mDefaultFocusToMiddle ? getChildCount() / 2 : 0;
     }
 

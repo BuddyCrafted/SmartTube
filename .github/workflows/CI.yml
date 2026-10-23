@@ -1,8 +1,7 @@
 name: Build Debug APK
 
+# WiiOS edition: the upstream nightly build runs only when started by hand; wiios.yml builds this fork.
 on:
-  push:
-    branches: [ "master" ]
   workflow_dispatch:
 
 jobs:

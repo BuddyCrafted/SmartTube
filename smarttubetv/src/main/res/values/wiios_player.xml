@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WiiOS edition: the YouTube-style player. -->
+<resources>
+    <item name="action_more" type="id" />
+    <item name="action_spacer_left" type="id" />
+    <item name="action_spacer_right" type="id" />
+    <item name="yt_default_focus" type="id" />
+
+    <string name="wiios_more">More</string>
+
+    <color name="yt_button_bg">#40FFFFFF</color>
+    <color name="yt_button_bg_focused">#FFFFFFFF</color>
+    <color name="yt_icon">#FFFFFFFF</color>
+    <color name="yt_icon_focused">#FF0F0F0F</color>
+
+    <dimen name="yt_button_size">42dp</dimen>
+    <dimen name="yt_play_size">58dp</dimen>
+    <dimen name="yt_icon_size">22dp</dimen>
+    <dimen name="yt_play_icon_size">28dp</dimen>
+    <dimen name="yt_button_gap">10dp</dimen>
+
+    <style name="WiiOSPlayerTime">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="android:shadowColor">#99000000</item>
+        <item name="android:shadowRadius">3</item>
+    </style>
+</resources>

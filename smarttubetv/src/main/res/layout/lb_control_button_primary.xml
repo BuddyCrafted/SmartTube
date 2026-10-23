@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WiiOS: YouTube-style round player button (replaces Leanback's). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/yt_button_gap"
+    android:layout_gravity="center_vertical" >
+
+    <ImageView
+        android:id="@+id/button"
+        style="?attr/playbackControlsButtonStyle"
+        android:layout_width="@dimen/yt_button_size"
+        android:layout_height="@dimen/yt_button_size"
+        android:background="@drawable/yt_button_bg"
+        android:focusable="true"
+        android:scaleType="center" />
+
+    <ImageView
+        android:id="@+id/icon"
+        android:layout_width="@dimen/yt_icon_size"
+        android:layout_height="@dimen/yt_icon_size"
+        android:layout_gravity="center"
+        android:scaleType="fitCenter"
+        android:duplicateParentState="false" />
+
+    <TextView
+        android:id="@+id/label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        style="?attr/playbackControlButtonLabelStyle" />
+
+</FrameLayout>

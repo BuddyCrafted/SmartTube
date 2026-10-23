@@ -1,0 +1,41 @@
+name: WiiOS edition
+
+# Builds SmartTube WiiOS (the stfdroid flavor, package com.buddycrafted.smarttube) on every push to master and
+# publishes it as a release, which WiiOS's Shop installs and updates from.
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleStfdroidRelease -PwiiosBuild=${{ github.run_number }}
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          base=$(grep -m1 'versionName "' smarttubetv/build.gradle | awk -F'"' '{print $2}')
+          tag="${base}-wiios.${{ github.run_number }}"
+          cd smarttubetv/build/outputs/apk/stfdroid/release
+          gh release create "$tag" *.apk --repo "${{ github.repository }}" --target "${{ github.sha }}" \
+            --title "SmartTube WiiOS $tag" --notes "${NOTES:-Manual build}"

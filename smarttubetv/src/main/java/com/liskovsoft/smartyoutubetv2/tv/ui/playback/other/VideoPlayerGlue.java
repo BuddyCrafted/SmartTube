@@ -28,6 +28,12 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.tweaks.MaxCo
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.tweaks.PlaybackTransportRowPresenter;
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.widget.OnActionLongClickedListener;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.AFRAction;
+import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.MoreAction;
+import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.SpacerAction;
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
+import android.os.Handler;
+import android.os.Looper;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.ActionHelpers;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.ChannelAction;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.ChatAction;
@@ -134,109 +140,80 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         putAction(new RotateAction(context));
         putAction(new FlipAction(context));
         putAction(new SoundOffAction(context));
+
+        // WiiOS: the gear and the row's gaps aren't SmartTube actions of their own.
+        mMoreAction = new MoreAction(context);
+        mSpacerLeft = new SpacerAction(R.id.action_spacer_left);
+        mSpacerRight = new SpacerAction(R.id.action_spacer_right);
     }
 
+    private final Action mMoreAction, mSpacerLeft, mSpacerRight;
+
+    /** WiiOS: what the gear lists, in this order (each opens or toggles exactly as its old button did). */
+    private static final int[] MORE_IDS = {
+            R.id.lb_control_high_quality, R.id.action_video_speed, R.id.action_repeat,
+            R.id.action_playback_queue, R.id.action_content_block, R.id.action_video_stats,
+            R.id.action_search, R.id.action_share, R.id.action_pip, R.id.action_screen_dimming,
+            R.id.action_seek_interval, R.id.action_video_zoom, R.id.action_rotate, R.id.action_flip,
+            R.id.action_sound_off, R.id.action_afr};
+
+    /** WiiOS: the gear's list of every player feature that isn't in the row. */
+    private void showMoreMenu() {
+        AppDialogPresenter dialog = AppDialogPresenter.instance(getContext());
+        addMoreItem(dialog, mSkipPreviousAction);
+        addMoreItem(dialog, mSkipNextAction);
+        for (int id : MORE_IDS) {
+            addMoreItem(dialog, mActions.get(id));
+        }
+        dialog.showDialog(getContext().getString(R.string.wiios_more));
+    }
+
+    private void addMoreItem(AppDialogPresenter dialog, Action action) {
+        if (action == null) {
+            return;
+        }
+        CharSequence label = action.getLabel1() != null ? action.getLabel1() : action.getLabel2();
+        if (label == null) {
+            return;
+        }
+        dialog.appendSingleButton(UiOptionItem.from(label, item -> {
+            dialog.closeDialog();
+            // After the list has gone, so a feature that opens its own list (quality, speed) can show it.
+            new Handler(Looper.getMainLooper()).post(() -> onActionClicked(action));
+        }));
+    }
+
+    /**
+     * WiiOS: one row laid out like YouTube's own TV player. Channel, description and subscribe on the left,
+     * play in the middle, like, dislike, comments, save, captions and the gear (everything else) on the right.
+     */
     @Override
     protected void onCreatePrimaryActions(ArrayObjectAdapter adapter) {
-        // Order matters, super.onCreatePrimaryActions() will create the play / pause action.
-        // Will display as follows:
-        // play/pause, previous, rewind, fast forward, next
-        //   > /||      |<        <<        >>         >|
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_PLAY_PAUSE)) {
-            super.onCreatePrimaryActions(adapter);
-        }
+        addIfPresent(adapter, R.id.action_channel);
+        addIfPresent(adapter, R.id.action_info);
+        addIfPresent(adapter, R.id.action_subscribe);
+        adapter.add(mSpacerLeft);
+        super.onCreatePrimaryActions(adapter);   // play / pause
+        adapter.add(mSpacerRight);
+        addIfPresent(adapter, R.id.action_thumbs_up);
+        addIfPresent(adapter, R.id.action_thumbs_down);
+        addIfPresent(adapter, R.id.action_chat);   // comments (live chat on a live stream)
+        addIfPresent(adapter, R.id.action_playlist_add);
+        addIfPresent(adapter, R.id.lb_control_closed_captioning);
+        adapter.add(mMoreAction);
+    }
 
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_PREVIOUS)) {
-            adapter.add(mSkipPreviousAction);
-        }
-        //adapter.add(mRewindAction);
-        //adapter.add(mFastForwardAction);
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_NEXT)) {
-            adapter.add(mSkipNextAction);
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_REPEAT_MODE)) {
-            adapter.add(mActions.get(R.id.action_repeat));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_SPEED)) {
-            adapter.add(mActions.get(R.id.action_video_speed));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_PIP)) {
-            adapter.add(mActions.get(R.id.action_pip));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SCREEN_DIMMING)) {
-            adapter.add(mActions.get(R.id.action_screen_dimming));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_CHAT)) {
-            adapter.add(mActions.get(R.id.action_chat));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SEARCH)) {
-            adapter.add(mActions.get(R.id.action_search));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SHARE)) {
-            adapter.add(mActions.get(R.id.action_share));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SEEK_INTERVAL)) {
-            adapter.add(mActions.get(R.id.action_seek_interval));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_ZOOM)) {
-            adapter.add(mActions.get(R.id.action_video_zoom));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_ROTATE)) {
-            adapter.add(mActions.get(R.id.action_rotate));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_FLIP)) {
-            adapter.add(mActions.get(R.id.action_flip));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SOUND_OFF)) {
-            adapter.add(mActions.get(R.id.action_sound_off));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_AFR)) {
-            adapter.add(mActions.get(R.id.action_afr));
+    private void addIfPresent(ArrayObjectAdapter adapter, int id) {
+        Action action = mActions.get(id);
+        if (action != null) {
+            adapter.add(action);
         }
     }
 
     @Override
     protected void onCreateSecondaryActions(ArrayObjectAdapter adapter) {
-        // Does nothing
+        // WiiOS: no second row; its buttons are in the gear.
         super.onCreateSecondaryActions(adapter);
-
-        // MAX: 7 items. But with custom modification it supports more.
-        // Origin: {@link androidx.leanback.widget.ControlBarPresenter#MAX_CONTROLS}
-        // Custom mod: {@link com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.ControlBarPresenter#MAX_CONTROLS}
-
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_HIGH_QUALITY)) {
-            adapter.add(mActions.get(R.id.lb_control_high_quality));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_OPEN_CHANNEL)) {
-            adapter.add(mActions.get(R.id.action_channel));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_LIKE)) {
-            adapter.add(mActions.get(R.id.action_thumbs_up));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_DISLIKE)) {
-            adapter.add(mActions.get(R.id.action_thumbs_down));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBTITLES)) {
-            adapter.add(mActions.get(R.id.lb_control_closed_captioning));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_ADD_TO_PLAYLIST)) {
-            adapter.add(mActions.get(R.id.action_playlist_add));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_SUBSCRIBE)) {
-            adapter.add(mActions.get(R.id.action_subscribe));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_INFO)) {
-            adapter.add(mActions.get(R.id.action_info));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_PLAYBACK_QUEUE)) {
-            adapter.add(mActions.get(R.id.action_playback_queue));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_CONTENT_BLOCK)) {
-            adapter.add(mActions.get(R.id.action_content_block));
-        }
-        if (mPlayerTweaksData.isPlayerButtonEnabled(PlayerTweaksData.PLAYER_BUTTON_VIDEO_STATS)) {
-            adapter.add(mActions.get(R.id.action_video_stats));
-        }
     }
 
     @Override
@@ -385,6 +362,14 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         }
 
         boolean handled = false;
+
+        if (action == mMoreAction) {
+            showMoreMenu();
+            return true;
+        }
+        if (action == mSpacerLeft || action == mSpacerRight) {
+            return true;
+        }
 
         // Primary actions are handled manually.
         if (action == mRewindAction) {

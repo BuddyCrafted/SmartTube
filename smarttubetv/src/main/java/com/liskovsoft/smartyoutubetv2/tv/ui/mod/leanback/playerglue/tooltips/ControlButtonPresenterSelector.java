@@ -26,6 +26,9 @@ import androidx.leanback.widget.PlaybackControlsRow;
 import androidx.leanback.widget.Presenter;
 import androidx.leanback.widget.PresenterSelector;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.PaddingAction;
+import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.SpacerAction;
+import android.graphics.PorterDuff;
+import android.widget.LinearLayout;
 
 /**
  * Displays primary and secondary controls for a {@link PlaybackControlsRow}.
@@ -75,11 +78,25 @@ public class ControlButtonPresenterSelector extends PresenterSelector {
         TextView mLabel;
         View mFocusableView;
 
+        boolean mPlay;
+
         public ActionViewHolder(View view) {
             super(view);
             mIcon = (ImageView) view.findViewById(R.id.icon);
             mLabel = (TextView) view.findViewById(R.id.label);
             mFocusableView = view.findViewById(R.id.button);
+        }
+
+        /** WiiOS: dark icons on the white buttons (the focused one, and play), white ones elsewhere. */
+        void applyTint() {
+            if (mIcon == null) {
+                return;
+            }
+            if (mPlay || mFocusableView.isFocused()) {
+                mIcon.setColorFilter(0xFF0F0F0F, PorterDuff.Mode.SRC_IN);
+            } else {
+                mIcon.clearColorFilter();   // keeps the highlight colour of a liked or switched-on button
+            }
         }
     }
 
@@ -95,7 +112,15 @@ public class ControlButtonPresenterSelector extends PresenterSelector {
         public ViewHolder onCreateViewHolder(ViewGroup parent) {
             View v = LayoutInflater.from(parent.getContext())
                     .inflate(mLayoutResourceId, parent, false);
-            return new ActionViewHolder(v);
+            ActionViewHolder vh = new ActionViewHolder(v);
+            View.OnFocusChangeListener old = vh.mFocusableView.getOnFocusChangeListener();
+            vh.mFocusableView.setOnFocusChangeListener((view, hasFocus) -> {
+                if (old != null) {
+                    old.onFocusChange(view, hasFocus);
+                }
+                vh.applyTint();
+            });
+            return vh;
         }
 
         // Used inside: com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.tweaks.ControlBarPresenter.ViewHolder.bindControlToAction()
@@ -105,6 +130,7 @@ public class ControlButtonPresenterSelector extends PresenterSelector {
             Action action = (Action) item;
             ActionViewHolder vh = (ActionViewHolder) viewHolder;
 
+            styleForYouTube(vh, action);
             vh.mIcon.setImageDrawable(action.getIcon());
             if (action instanceof PaddingAction) {
                 int padding = ((PaddingAction) action).getPadding();
@@ -131,6 +157,42 @@ public class ControlButtonPresenterSelector extends PresenterSelector {
                     TooltipCompatHandler.setTooltipText(vh.mFocusableView, action.getLabel1());
                 }
             }
+        }
+
+        /**
+         * WiiOS: a spacer stretches and can't be focused; play is the big white button, where focus starts.
+         */
+        private void styleForYouTube(ActionViewHolder vh, Action action) {
+            boolean spacer = action instanceof SpacerAction;
+            ViewGroup.LayoutParams lp = vh.view.getLayoutParams();
+            if (lp instanceof LinearLayout.LayoutParams) {
+                LinearLayout.LayoutParams llp = (LinearLayout.LayoutParams) lp;
+                llp.width = spacer ? 0 : ViewGroup.LayoutParams.WRAP_CONTENT;
+                llp.weight = spacer ? 1f : 0f;
+                vh.view.setLayoutParams(llp);
+            }
+            vh.mFocusableView.setFocusable(!spacer);
+            vh.mFocusableView.setVisibility(spacer ? View.INVISIBLE : View.VISIBLE);
+            vh.mIcon.setVisibility(spacer ? View.INVISIBLE : View.VISIBLE);
+
+            boolean play = action instanceof PlaybackControlsRow.PlayPauseAction;
+            android.content.res.Resources res = vh.view.getResources();
+            int size = res.getDimensionPixelSize(play ? com.liskovsoft.smartyoutubetv2.tv.R.dimen.yt_play_size : com.liskovsoft.smartyoutubetv2.tv.R.dimen.yt_button_size);
+            int icon = res.getDimensionPixelSize(play ? com.liskovsoft.smartyoutubetv2.tv.R.dimen.yt_play_icon_size : com.liskovsoft.smartyoutubetv2.tv.R.dimen.yt_icon_size);
+            ViewGroup.LayoutParams blp = vh.mFocusableView.getLayoutParams();
+            if (blp.width != size) {
+                blp.width = blp.height = size;
+                vh.mFocusableView.setLayoutParams(blp);
+                ViewGroup.LayoutParams ilp = vh.mIcon.getLayoutParams();
+                ilp.width = ilp.height = icon;
+                vh.mIcon.setLayoutParams(ilp);
+            }
+            if (play != vh.mPlay) {
+                vh.mFocusableView.setBackgroundResource(play ? com.liskovsoft.smartyoutubetv2.tv.R.drawable.yt_play_bg : com.liskovsoft.smartyoutubetv2.tv.R.drawable.yt_button_bg);
+            }
+            vh.mPlay = play;
+            vh.view.setTag(com.liskovsoft.smartyoutubetv2.tv.R.id.yt_default_focus, play ? Boolean.TRUE : null);
+            vh.applyTint();
         }
 
         @Override
