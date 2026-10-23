@@ -1,0 +1,81 @@
+name: Follow SmartTube
+
+# Every six hours: when yuliskov/SmartTube's master has a new version (its versionName changed), merge it into
+# this fork and publish a new SmartTube WiiOS, so YouTube fixes arrive without anyone doing anything. If the
+# merge or the build fails, an issue is opened here (GitHub emails the owner) and nothing is published.
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    outputs:
+      merged: ${{ steps.merge.outputs.merged }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Merge a new SmartTube version
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/yuliskov/SmartTube.git
+          git fetch upstream master
+          ours=$(grep -m1 'versionName "' smarttubetv/build.gradle | awk -F'"' '{print $2}')
+          theirs=$(git show upstream/master:smarttubetv/build.gradle | grep -m1 'versionName "' | awk -F'"' '{print $2}')
+          echo "ours=$ours theirs=$theirs"
+          if [ "$ours" = "$theirs" ] || git merge-base --is-ancestor upstream/master HEAD; then
+            echo "Up to date."
+            exit 0
+          fi
+          if ! git merge --no-edit -m "Merge SmartTube $theirs" upstream/master; then
+            git merge --abort || true
+            gh issue create --repo "${{ github.repository }}" --title "Couldn't merge SmartTube $theirs" \
+              --body "The automatic merge of yuliskov/SmartTube $theirs into master hit conflicts, so SmartTube WiiOS stays on $ours for now. Ask Claude to merge it by hand. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            exit 1
+          fi
+          git submodule update --init --recursive
+          echo "merged=$theirs" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        if: steps.merge.outputs.merged != ''
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Check it builds, then push
+        if: steps.merge.outputs.merged != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x gradlew
+          if ! ./gradlew assembleStfdroidRelease; then
+            gh issue create --repo "${{ github.repository }}" --title "SmartTube ${{ steps.merge.outputs.merged }} merged but doesn't build" \
+              --body "The merge of yuliskov/SmartTube ${{ steps.merge.outputs.merged }} went in cleanly but the WiiOS edition doesn't build, so it wasn't pushed. Ask Claude to fix it. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            exit 1
+          fi
+          if ! git push origin HEAD:master; then
+            # GitHub won't let this job's token push upstream commits that change workflow files.
+            gh issue create --repo "${{ github.repository }}" --title "SmartTube ${{ steps.merge.outputs.merged }} is ready but couldn't be pushed" \
+              --body "SmartTube ${{ steps.merge.outputs.merged }} merges and builds, but GitHub refused the automatic push (usually because the update changes SmartTube's own workflow files). On this repository's main page press Sync fork, then Update branch (never Discard commits): that push builds and publishes SmartTube WiiOS. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            exit 1
+          fi
+
+  publish:
+    needs: merge
+    if: needs.merge.outputs.merged != ''
+    uses: ./.github/workflows/wiios.yml
+    permissions:
+      contents: write

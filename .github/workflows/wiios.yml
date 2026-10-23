@@ -1,11 +1,13 @@
 name: WiiOS edition
 
-# Builds SmartTube WiiOS (the stfdroid flavor, package com.buddycrafted.smarttube) on every push to master and
-# publishes it as a release, which WiiOS's Shop installs and updates from.
+# Builds SmartTube WiiOS (the stfdroid flavor, package com.buddycrafted.smarttube) and publishes it as a release
+# with smarttube_wiios.json, which the app's own updater and WiiOS's Shop install it from. Runs on every push
+# to master, by hand, and from upstream-sync.yml after it merges a new SmartTube version.
 on:
   push:
     branches: [ "master" ]
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: write
@@ -16,6 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: master
+          fetch-depth: 0
           submodules: recursive
 
       - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -24,22 +28,44 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Build
+      - name: Version
+        id: version
         run: |
-          chmod +x gradlew
-          ./gradlew assembleStfdroidRelease -PwiiosBuild=${{ github.run_number }}
+          # The number of commits on master: grows with every change and every upstream merge, whichever
+          # workflow builds it, so a newer build always has a higher versionCode.
+          n=$(git rev-list --count HEAD)
+          base=$(grep -m1 'versionName "' smarttubetv/build.gradle | awk -F'"' '{print $2}')
+          echo "n=$n" >> "$GITHUB_OUTPUT"
+          echo "tag=${base}-wiios.$n" >> "$GITHUB_OUTPUT"
+          echo "notes=$(git log -1 --format=%s)" >> "$GITHUB_OUTPUT"
 
-      - name: Publish
+      - name: Already published?
+        id: exists
         env:
           GH_TOKEN: ${{ github.token }}
-          NOTES: ${{ github.event.head_commit.message }}
         run: |
-          base=$(grep -m1 'versionName "' smarttubetv/build.gradle | awk -F'"' '{print $2}')
-          tag="${base}-wiios.${{ github.run_number }}"
+          if gh release view "${{ steps.version.outputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.exists.outputs.yes != 'true'
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleStfdroidRelease -PwiiosBuild=${{ steps.version.outputs.n }}
+
+      - name: Publish
+        if: steps.exists.outputs.yes != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          CODE: ${{ steps.version.outputs.n }}
+          NOTES: ${{ steps.version.outputs.notes }}
+        run: |
           cd smarttubetv/build/outputs/apk/stfdroid/release
           # The app's own updater reads this (update_urls in common/src/stfdroid), from the latest release.
-          dl="https://github.com/${{ github.repository }}/releases/download/$tag"
-          python3 - "$tag" "$dl" "$((3000000 + ${{ github.run_number }}))" > smarttube_wiios.json <<'PY'
+          dl="https://github.com/${{ github.repository }}/releases/download/$TAG"
+          python3 - "$TAG" "$dl" "$((3000000 + CODE))" > smarttube_wiios.json <<'PY'
           import glob, json, os, sys
           tag, dl, code = sys.argv[1], sys.argv[2], int(sys.argv[3])
           def apk(abi):
@@ -53,5 +79,5 @@ jobs:
           }, indent=2))
           PY
           cat smarttube_wiios.json
-          gh release create "$tag" *.apk smarttube_wiios.json --repo "${{ github.repository }}" \
-            --target "${{ github.sha }}" --title "SmartTube WiiOS $tag" --notes "${NOTES:-Manual build}"
+          gh release create "$TAG" *.apk smarttube_wiios.json --repo "${{ github.repository }}" \
+            --target master --title "SmartTube WiiOS $TAG" --notes "$NOTES"
